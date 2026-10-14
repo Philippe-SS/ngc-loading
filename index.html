@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nGc.BR Zombie Escape</title>
+<!--
+  Tela de carregamento do servidor nGc.BR (sv_loadingurl). Mesmo visual dos menus do jogo (estilo "Quarentena":
+  painel escuro oliva, canto cortado, faixa listrada ambar e preta, azul dos humanos, verde dos zumbis).
+  O GMod chama as funcoes globais GameDetails, SetStatusChanged, SetFilesTotal, SetFilesNeeded e DownloadingFile.
+  Parametros da URL: v=a|b|c (layout), map=<mapa> e sid=<steamid64> (o servidor pode passar %m e %s), demo=1 (simula
+  o carregamento; liga sozinho se o jogo nao chamar nada em 2 s, para ver no navegador).
+-->
+<style>
+@font-face { font-family: "Chakra"; src: url("fonts/ChakraPetch-Bold.ttf"); font-weight: 700; }
+@font-face { font-family: "Chakra"; src: url("fonts/ChakraPetch-SemiBold.ttf"); font-weight: 600; }
+@font-face { font-family: "Plex"; src: url("fonts/IBMPlexSans-Medium.ttf"); font-weight: 500; }
+@font-face { font-family: "Plex"; src: url("fonts/IBMPlexSans-SemiBold.ttf"); font-weight: 600; }
+
+:root {
+	--bg: #14160f;
+	--panel: rgba(20, 22, 15, 0.94);
+	--panel2: rgba(225, 215, 170, 0.04);
+	--border: rgba(232, 190, 80, 0.30);
+	--line: rgba(255, 255, 255, 0.08);
+	--text: #eeead9;
+	--dim: #aba68d;
+	--faint: #6d6a57;
+	--hazard: #e3ae3a;
+	--hazard2: #16170f;
+	--human: #3ca0f0;
+	--zombie: #46c83c;
+	--cut: 18px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+body {
+	background: var(--bg);
+	color: var(--text);
+	font-family: "Plex", "Segoe UI", sans-serif;
+	font-weight: 500;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* background: the map's picture when there is one, darkened; faint diagonal tape texture on top */
+#bgimg {
+	position: fixed; inset: -20px;
+	background-size: cover; background-position: center;
+	filter: blur(3px) saturate(0.7) brightness(0.35);
+	opacity: 0; transition: opacity 1.2s;
+}
+#bgimg.on { opacity: 1; }
+#bgtex {
+	position: fixed; inset: 0;
+	background:
+		radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.65) 100%),
+		repeating-linear-gradient(135deg, rgba(227,174,58,0.025) 0 40px, rgba(0,0,0,0) 40px 80px);
+}
+
+.label { font-family: "Chakra"; font-weight: 600; text-transform: uppercase; letter-spacing: 0.22em; font-size: 13px; color: var(--dim); }
+.title { font-family: "Chakra"; font-weight: 700; text-transform: uppercase; line-height: 0.95; }
+
+/* panel with the top-left and bottom-right corners cut, 1 px amber border (border = outer clip, fill = inner clip) */
+.cut { position: relative; background: var(--border); padding: 1px;
+	clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut)); }
+.cut > .in { background: var(--panel); height: 100%;
+	clip-path: polygon(calc(var(--cut) - 0.4px) 0, 100% 0, 100% calc(100% - var(--cut) + 0.4px), calc(100% - var(--cut) + 0.4px) 100%, 0 100%, 0 calc(var(--cut) - 0.4px)); }
+/* hazard strip along the top edge that ends in the corner cut, like the game's frames */
+.strip { position: absolute; left: 0; right: 0; top: 0; height: 6px; z-index: 2;
+	background: repeating-linear-gradient(135deg, var(--hazard) 0 7px, var(--hazard2) 7px 14px);
+	clip-path: polygon(var(--cut) 0, 100% 0, 100% 100%, calc(var(--cut) - 6px) 100%); }
+
+/* team mark: amber striped block next to the title */
+.mark { width: 22px; height: 52px; flex: none;
+	background: repeating-linear-gradient(135deg, var(--hazard) 0 6px, transparent 6px 12px); }
+.brand { display: flex; align-items: center; gap: 16px; }
+.brand .title { font-size: 46px; text-transform: none; }   /* the clan writes it nGc.BR */
+.brand .label { margin-top: 6px; }
+
+/* progress: blocks like the admin winrate bar; the block where it is filling is painted in proportion */
+.blocks { display: flex; gap: 4px; height: 12px; }
+.blocks i { flex: 1; background: rgba(255,255,255,0.08); position: relative; overflow: hidden; }
+.blocks i b { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--hazard); transition: width 0.25s; }
+.prog-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; gap: 16px; }
+.status { font-size: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pct { font-family: "Chakra"; font-weight: 700; font-size: 26px; color: var(--hazard); }
+.file { font-size: 13px; color: var(--faint); margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 18px; }
+
+.map-name { font-size: 40px; }
+.map-raw { font-size: 14px; color: var(--faint); margin-top: 6px; }
+.thumb { background: #0d0e09 center / cover no-repeat; position: relative; }
+.thumb.none { background: repeating-linear-gradient(135deg, rgba(227,174,58,0.10) 0 14px, rgba(0,0,0,0) 14px 28px), #0d0e09; }
+
+.tip { font-size: 19px; line-height: 1.45; color: var(--text); min-height: 56px; transition: opacity 0.4s; }
+.tip.fade { opacity: 0; }
+.keys { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.key { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--dim); }
+.key kbd { font-family: "Chakra"; font-weight: 700; font-size: 15px; color: var(--text); min-width: 34px; height: 32px; padding: 0 8px;
+	display: inline-flex; align-items: center; justify-content: center;
+	border: 1px solid rgba(255,255,255,0.28); border-bottom-width: 3px; background: rgba(255,255,255,0.04); }
+.chip { font-family: "Chakra"; font-weight: 600; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+	padding: 4px 9px; background: rgba(227,174,58,0.18); color: var(--hazard); display: inline-block; }
+
+.layout { display: none; position: fixed; inset: 0; }
+body.v-a #A, body.v-b #B, body.v-c #C { display: block; }
+
+/* A: one centred panel ---------------------------------------------------------------------------- */
+#A .cut { position: absolute; left: 50%; top: 50%; width: min(1000px, 92vw); transform: translate(-50%, -50%); }
+#A .in { padding: 34px 40px 30px; }
+#A .head { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+#A .server { text-align: right; max-width: 45%; }
+#A .server .name { font-size: 16px; color: var(--text); margin-top: 6px; }
+#A .mid { display: flex; gap: 28px; padding: 26px 0; border-bottom: 1px solid var(--line); }
+#A .thumb { width: 300px; height: 169px; flex: none; }
+#A .mid .info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+#A .foot { display: flex; gap: 36px; padding-top: 24px; align-items: flex-start; }
+#A .foot .tipbox { flex: 1; }
+#A .foot .label { margin-bottom: 10px; }
+
+/* B: the map full screen, a band at the bottom ------------------------------------------------------ */
+#B .top { position: absolute; left: 56px; top: 48px; }
+#B .server { position: absolute; right: 56px; top: 54px; text-align: right; }
+#B .server .name { font-size: 16px; margin-top: 6px; }
+#B .mapbig { position: absolute; left: 56px; bottom: 250px; }
+#B .mapbig .map-name { font-size: 72px; text-shadow: 0 3px 18px rgba(0,0,0,0.7); }
+#B .band { position: absolute; left: 0; right: 0; bottom: 0; height: 210px;
+	background: linear-gradient(rgba(20,22,15,0.92), rgba(20,22,15,0.97)); border-top: 1px solid var(--border); }
+#B .band::before { content: ""; position: absolute; left: 0; right: 0; top: -7px; height: 6px;
+	background: repeating-linear-gradient(135deg, var(--hazard) 0 7px, var(--hazard2) 7px 14px); }
+#B .cols { display: flex; gap: 56px; padding: 34px 56px; height: 100%; }
+#B .cols > div { flex: 1; min-width: 0; }
+#B .cols .label { margin-bottom: 12px; }
+
+/* C: a column on the left, keys and tip on the right ------------------------------------------------- */
+#C .col { position: absolute; left: 0; top: 0; bottom: 0; width: 520px; }
+#C .col .cut { height: 100%; --cut: 26px; }
+#C .col .in { padding: 54px 44px 40px; display: flex; flex-direction: column; gap: 34px; }
+#C .thumb { width: 100%; height: 240px; }
+#C .grow { flex: 1; }
+#C .side { position: absolute; left: 600px; right: 70px; bottom: 80px; }
+#C .side .tip { font-size: 26px; max-width: 900px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+#C .side .label { margin-bottom: 14px; }
+#C .side .keys { margin-top: 40px; }
+#C .server .name { font-size: 16px; margin-top: 6px; }
+
+/* variant switcher, only in demo (to compare in a normal browser) */
+#vs { position: fixed; right: 12px; bottom: 12px; display: none; gap: 6px; z-index: 9; }
+#vs a { font-family: "Chakra"; font-weight: 700; color: var(--text); background: rgba(0,0,0,0.6); border: 1px solid var(--border);
+	padding: 6px 12px; text-decoration: none; }
+body.demo #vs { display: flex; }
+</style>
+</head>
+<body class="v-a">
+<div id="bgimg"></div>
+<div id="bgtex"></div>
+
+<!-- A -->
+<div class="layout" id="A">
+	<div class="cut"><div class="strip"></div><div class="in">
+		<div class="head">
+			<div class="brand"><div class="mark"></div><div><div class="title">nGc.BR</div><div class="label">zombie escape</div></div></div>
+			<div class="server"><div class="label">servidor</div><div class="name" data-f="server">nGc.BR Zombie Escape</div></div>
+		</div>
+		<div class="mid">
+			<div class="thumb none" data-f="thumb"></div>
+			<div class="info">
+				<div><div class="label">carregando o mapa</div><div class="title map-name" data-f="map" style="margin-top:10px">...</div><div class="map-raw" data-f="mapraw"></div></div>
+				<div>
+					<div class="prog-row"><div class="status" data-f="status">Conectando ao servidor</div><div class="pct" data-f="pct">0%</div></div>
+					<div class="blocks" data-f="blocks"></div>
+					<div class="file" data-f="file"></div>
+				</div>
+			</div>
+		</div>
+		<div class="foot">
+			<div class="tipbox"><div class="label">dica</div><div class="tip" data-f="tip"></div></div>
+			<div><div class="label">teclas</div><div class="keys" data-f="keys" style="flex-direction:column;gap:8px"></div></div>
+		</div>
+	</div></div>
+</div>
+
+<!-- B -->
+<div class="layout" id="B">
+	<div class="top brand"><div class="mark"></div><div><div class="title">nGc.BR</div><div class="label">zombie escape</div></div></div>
+	<div class="server"><div class="label">servidor</div><div class="name" data-f="server">nGc.BR Zombie Escape</div></div>
+	<div class="mapbig"><div class="label">carregando o mapa</div><div class="title map-name" data-f="map" style="margin-top:10px">...</div><div class="map-raw" data-f="mapraw"></div></div>
+	<div class="band"><div class="cols">
+		<div>
+			<div class="prog-row"><div class="status" data-f="status">Conectando ao servidor</div><div class="pct" data-f="pct">0%</div></div>
+			<div class="blocks" data-f="blocks"></div>
+			<div class="file" data-f="file"></div>
+		</div>
+		<div><div class="label">dica</div><div class="tip" data-f="tip"></div></div>
+		<div style="flex:0.7"><div class="label">teclas</div><div class="keys" data-f="keys"></div></div>
+	</div></div>
+</div>
+
+<!-- C -->
+<div class="layout" id="C">
+	<div class="col"><div class="cut"><div class="strip"></div><div class="in">
+		<div class="brand"><div class="mark"></div><div><div class="title">nGc.BR</div><div class="label">zombie escape</div></div></div>
+		<div>
+			<div class="thumb none" data-f="thumb"></div>
+			<div class="label" style="margin-top:18px">carregando o mapa</div>
+			<div class="title map-name" data-f="map" style="margin-top:8px;font-size:34px">...</div>
+			<div class="map-raw" data-f="mapraw"></div>
+		</div>
+		<div class="grow"></div>
+		<div>
+			<div class="prog-row"><div class="status" data-f="status">Conectando ao servidor</div><div class="pct" data-f="pct">0%</div></div>
+			<div class="blocks" data-f="blocks"></div>
+			<div class="file" data-f="file"></div>
+		</div>
+		<div class="server"><div class="label">servidor</div><div class="name" data-f="server">nGc.BR Zombie Escape</div></div>
+	</div></div></div>
+	<div class="side">
+		<div class="label">dica</div>
+		<div class="tip" data-f="tip"></div>
+		<div class="keys" data-f="keys"></div>
+	</div>
+</div>
+
+<div id="vs"><a href="#" data-v="a">A</a><a href="#" data-v="b">B</a><a href="#" data-v="c">C</a></div>
+
+<script>
+(function () {
+	var q = {};
+	location.search.replace(/^\?/, "").split("&").forEach(function (kv) {
+		if (!kv) return;
+		var p = kv.split("=");
+		q[decodeURIComponent(p[0])] = decodeURIComponent((p[1] || "").replace(/\+/g, " "));
+	});
+
+	var variant = /^[abc]$/.test(q.v || "") ? q.v : "a";
+	document.body.className = "v-" + variant;
+
+	// Map pictures we have (maps/<name>.png); anything else gets the striped placeholder.
+	var MAP_PICS = { ze_dark_souls: 1, ze_lotr_minas_tirith_v3_3: 1 };
+
+	var TIPS = [
+		"B abre a loja. As armas normais são grátis, mas só chegam nos primeiros segundos do round.",
+		"Zumbi: o botão direito usa a habilidade da sua classe.",
+		"F3 escolhe a sua classe de zumbi. A escolha vale no próximo spawn.",
+		"Todo mundo tem pulo duplo: aperte pular de novo no ar.",
+		"Tiro empurra zumbi. Em grupo, vocês seguram qualquer passagem.",
+		"O colete aguenta uma infecção e depois quebra.",
+		"Granada de gelo congela; a de fogo queima e deixa o zumbi lento.",
+		"Sobreviveu ao round? Você volta com o mesmo equipamento.",
+		"As mensagens do mapa aparecem no painel MAPA, à esquerda da tela.",
+		"F2 abre as opções: tamanho do HUD, sons, teclas e efeitos.",
+		"C personaliza a arma na mão. Salve a montagem e pegue de novo na loja."
+	];
+	var KEYS = [["F1", "ajuda"], ["B", "loja"], ["F2", "opções"], ["F3", "classe de zumbi"], ["C", "personalizar arma"]];
+
+	function all(f) { return document.querySelectorAll('[data-f="' + f + '"]'); }
+	function setText(f, t) { var e = all(f); for (var i = 0; i < e.length; i++) e[i].textContent = t; }
+
+	// map name: "ze_lotr_minas_tirith_v3_3" -> "LOTR MINAS TIRITH"
+	function prettyMap(m) {
+		var s = String(m || "").replace(/^ze_/i, "").replace(/_v\d.*$/i, "").replace(/_(b|beta|final|fix)\d*$/i, "");
+		return s.replace(/_/g, " ").trim() || m;
+	}
+	function setMap(m) {
+		if (!m) return;
+		setText("map", prettyMap(m));
+		setText("mapraw", m);
+		var t = all("thumb");
+		var pic = MAP_PICS[m] ? "maps/" + m + ".png" : null;
+		for (var i = 0; i < t.length; i++) {
+			if (pic) { t[i].style.backgroundImage = "url('" + pic + "')"; t[i].className = "thumb"; }
+		}
+		var bg = document.getElementById("bgimg");
+		if (pic) { bg.style.backgroundImage = "url('" + pic + "')"; bg.className = "on"; }
+	}
+
+	// progress blocks
+	var NB = 20, blockEls = [];
+	(function () {
+		var holders = all("blocks");
+		for (var h = 0; h < holders.length; h++) {
+			var list = [];
+			for (var i = 0; i < NB; i++) {
+				var c = document.createElement("i"), b = document.createElement("b");
+				c.appendChild(b); holders[h].appendChild(c); list.push(b);
+			}
+			blockEls.push(list);
+		}
+	})();
+	var shown = 0;
+	function setProgress(p) {
+		p = Math.max(shown, Math.min(1, p));   // never goes back
+		shown = p;
+		for (var h = 0; h < blockEls.length; h++) {
+			for (var i = 0; i < NB; i++) {
+				var part = Math.max(0, Math.min(1, p * NB - i));
+				blockEls[h][i].style.width = (part * 100) + "%";
+			}
+		}
+		setText("pct", Math.round(p * 100) + "%");
+	}
+
+	// engine status -> Portuguese, and a rough place on the bar when there is no file count
+	var STAGES = [
+		[/workshop/i, "Baixando conteúdo da Workshop", 0.15],
+		[/mount/i, "Preparando os addons", 0.55],
+		[/download/i, "Baixando arquivos", 0.35],
+		[/lua/i, "Carregando os scripts", 0.75],
+		[/(map|world|lighting|static|entities|precach)/i, "Carregando o mapa", 0.85],
+		[/(client info|server info|retriev|connect|sending|request)/i, "Conectando ao servidor", 0.05],
+		[/(complete|done|spawn)/i, "Quase lá", 0.95]
+	];
+	var filesTotal = 0, filesNeeded = 0;
+	function filesProgress() { return filesTotal > 0 ? (filesTotal - filesNeeded) / filesTotal : 0; }
+
+	window.GameDetails = function (servername, serverurl, mapname, maxplayers, steamid, gamemode) {
+		live = true;
+		if (servername) setText("server", servername);
+		setMap(mapname);
+	};
+	window.SetStatusChanged = function (status) {
+		live = true;
+		var txt = status, at = null;
+		for (var i = 0; i < STAGES.length; i++) {
+			if (STAGES[i][0].test(status)) { txt = STAGES[i][1]; at = STAGES[i][2]; break; }
+		}
+		setText("status", txt);
+		if (at !== null && filesTotal === 0) setProgress(at);
+	};
+	window.SetFilesTotal = function (n) { live = true; filesTotal = Number(n) || 0; };
+	window.SetFilesNeeded = function (n) {
+		live = true; filesNeeded = Number(n) || 0;
+		if (filesTotal > 0) setProgress(0.1 + filesProgress() * 0.8);
+	};
+	window.DownloadingFile = function (f) { live = true; setText("file", f || ""); };
+
+	// tips: one every 7 s, with a fade
+	var tipEls = all("tip"), tipAt = Math.floor(Math.random() * TIPS.length);
+	function showTip() {
+		for (var i = 0; i < tipEls.length; i++) tipEls[i].textContent = TIPS[tipAt % TIPS.length];
+	}
+	showTip();
+	setInterval(function () {
+		for (var i = 0; i < tipEls.length; i++) tipEls[i].className = "tip fade";
+		setTimeout(function () {
+			tipAt++; showTip();
+			for (var i = 0; i < tipEls.length; i++) tipEls[i].className = "tip";
+		}, 400);
+	}, 7000);
+
+	// keys
+	var keyHolders = all("keys");
+	for (var k = 0; k < keyHolders.length; k++) {
+		for (var j = 0; j < KEYS.length; j++) {
+			var d = document.createElement("div"); d.className = "key";
+			d.innerHTML = "<kbd>" + KEYS[j][0] + "</kbd><span>" + KEYS[j][1] + "</span>";
+			keyHolders[k].appendChild(d);
+		}
+	}
+
+	if (q.map) setMap(q.map);
+	setProgress(0);
+
+	// demo: the game did not call us (normal browser) or demo=1 was asked
+	var live = false;
+	function demo() {
+		document.body.className += " demo";
+		window.GameDetails("nGc.BR | Zombie Escape", "", q.map || "ze_lotr_minas_tirith_v3_3", 32, "", "zombieescape");
+		var steps = [
+			[0, function () { SetStatusChanged("Retrieving server info..."); }],
+			[1500, function () { SetStatusChanged("Requesting Workshop files"); SetFilesTotal(40); SetFilesNeeded(40); }]
+		];
+		for (var n = 39; n >= 0; n--) (function (left, t) {
+			steps.push([t, function () { DownloadingFile("addon " + (40 - left) + " de 40"); SetFilesNeeded(left); }]);
+		})(n, 1800 + (39 - n) * 220);
+		steps.push([11000, function () { DownloadingFile(""); SetStatusChanged("Mounting Addons"); }]);
+		steps.push([12500, function () { SetStatusChanged("Lua - Loading Lua files"); }]);
+		steps.push([14000, function () { SetStatusChanged("Loading world"); }]);
+		steps.push([16000, function () { SetStatusChanged("Sending client info"); }]);
+		steps.forEach(function (s) { setTimeout(s[1], s[0]); });
+		if (q.demo === "1") setTimeout(function () { location.reload(); }, 19000);
+	}
+	if (q.demo === "1") demo();
+	else setTimeout(function () { if (!live) demo(); }, 2000);
+
+	var vs = document.querySelectorAll("#vs a");
+	for (var a = 0; a < vs.length; a++) vs[a].onclick = function (e) {
+		e.preventDefault();
+		document.body.className = "v-" + this.getAttribute("data-v") + " demo";
+	};
+})();
+</script>
+</body>
+</html>
