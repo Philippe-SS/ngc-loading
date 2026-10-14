@@ -234,8 +234,9 @@ body.demo #vs { display: flex; }
 	var variant = /^[abc]$/.test(q.v || "") ? q.v : "a";
 	document.body.className = "v-" + variant;
 
-	// Map pictures we have (maps/<name>.png); anything else gets the striped placeholder.
-	var MAP_PICS = { ze_dark_souls: 1, ze_lotr_minas_tirith_v3_3: 1 };
+	// Map pictures (maps/<file>); anything else gets the striped placeholder. Edited copies "<map>_ngc" use the original's.
+	var MAP_PICS = { ze_dark_souls: "ze_dark_souls.png", ze_lotr_minas_tirith_v3_3: "ze_lotr_minas_tirith_v3_3.png" };
+	var MAP_ALIAS = { ze_lotr_mount_doom_ngc: "ze_lotr_mount_doom_v3" };
 
 	var TIPS = [
 		"B abre a loja. As armas normais são grátis, mas só chegam nos primeiros segundos do round.",
@@ -265,7 +266,8 @@ body.demo #vs { display: flex; }
 		setText("map", prettyMap(m));
 		setText("mapraw", m);
 		var t = all("thumb");
-		var pic = MAP_PICS[m] ? "maps/" + m + ".png" : null;
+		var key = MAP_ALIAS[m] || m;
+		var pic = MAP_PICS[key] ? "maps/" + MAP_PICS[key] : null;
 		for (var i = 0; i < t.length; i++) {
 			if (pic) { t[i].style.backgroundImage = "url('" + pic + "')"; t[i].className = "thumb"; }
 		}
@@ -380,7 +382,8 @@ body.demo #vs { display: flex; }
 		if (q.demo === "1") setTimeout(function () { location.reload(); }, 19000);
 	}
 	if (q.demo === "1") demo();
-	else setTimeout(function () { if (!live) demo(); }, 2000);
+	// only outside the game: the server always passes map= and sid=, and a slow first call must never show fake files
+	else if (!q.map && !q.sid) setTimeout(function () { if (!live) demo(); }, 2000);
 
 	var vs = document.querySelectorAll("#vs a");
 	for (var a = 0; a < vs.length; a++) vs[a].onclick = function (e) {
