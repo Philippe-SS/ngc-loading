@@ -235,13 +235,13 @@ body.demo #vs { display: flex; }
 	var variant = /^[abc]$/.test(q.v || "") ? q.v : "a";
 	document.body.className = "v-" + variant;
 
-	// Map pictures (maps/<file>); anything else gets the striped placeholder. Edited copies "<map>_ngc" use the original's.
+	// Map pictures (maps/<file>); anything else gets the striped placeholder. MAP_ALIAS: a map that should show another one's photo.
 	// Photos taken in the lab (nGc.BR tools/maps/scenic.sh), one picked per map, 1280x720.
 	var MAP_PICS = {};
-	["ze_dark_souls", "ze_death_star_escape_v4_3", "ze_fapescape_rote_v1_3f", "ze_ffvii_mako_reactor_v5_3", "ze_icecap_escape_v5",
-		"ze_isla_nublar_v2_1", "ze_jurassicpark_v2", "ze_lotr_minas_tirith_v3_3", "ze_lotr_mount_doom_ngc", "ze_lotr_mount_doom_v3",
-		"ze_minecraft_v1_1", "ze_mirrors_edge_reborn_v4_2", "ze_outlast_v1", "ze_pirates_port_royal_v5_4s2", "ze_predator_ultimate_v3",
-		"ze_shroomforest2_v1", "ze_sunlight_v2_0", "ze_venice_escape_b2"].forEach(function (m) { MAP_PICS[m] = m + ".jpg"; });
+	// to retake by the owner (2026-10-14): ze_venice_escape_b2, ze_sunlight_v2_0, ze_icecap_escape_v5, ze_shroomforest2_v1
+	["ze_dark_souls", "ze_death_star_escape_v4_3", "ze_fapescape_rote_v1_3f", "ze_ffvii_mako_reactor_v5_3", "ze_isla_nublar_v2_1",
+		"ze_jurassicpark_v2", "ze_lotr_minas_tirith_v3_3", "ze_lotr_mount_doom_ngc", "ze_minecraft_v1_1", "ze_mirrors_edge_reborn_v4_2",
+		"ze_outlast_v1", "ze_pirates_port_royal_v5_4s2", "ze_predator_ultimate_v3"].forEach(function (m) { MAP_PICS[m] = m + ".jpg"; });
 	var MAP_ALIAS = {};
 
 	var TIPS = [
