@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-18T01:19:02.113Z",
+ "updated": "2026-10-18T01:47:03.505Z",
  "staff": [
   {
    "id": "76561198011173239",
@@ -12,24 +12,6 @@
    "name": "Sirr John",
    "role": "owner",
    "avatar": "https://avatars.fastly.steamstatic.com/e6fd518f874dd79985ac50344f9ec2e461fda5eb_full.jpg"
-  },
-  {
-   "id": "76561199097840003",
-   "name": "braziliannationalist",
-   "role": "admin",
-   "avatar": "https://avatars.fastly.steamstatic.com/fc22ba973626b26ecf0c3ed0daf83cadbacb8445_full.jpg"
-  },
-  {
-   "id": "76561199391059045",
-   "name": "Jax ☧",
-   "role": "admin",
-   "avatar": "https://avatars.fastly.steamstatic.com/c67fd4686e6edceef0f0239da087fb5b92e97ec7_full.jpg"
-  },
-  {
-   "id": "76561199145258946",
-   "name": "monixss",
-   "role": "admin",
-   "avatar": "https://avatars.fastly.steamstatic.com/ea63f1f1854a584401466b5512f1d163d664bca6_full.jpg"
   }
  ]
 }
