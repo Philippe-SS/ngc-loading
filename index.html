@@ -11,6 +11,7 @@
   O GMod chama as funcoes globais GameDetails, SetStatusChanged, SetFilesTotal, SetFilesNeeded e DownloadingFile.
   Parametros da URL: v=a|b|c (layout), map=<mapa> e sid=<steamid64> (o servidor pode passar %m e %s), demo=1 (simula
   o carregamento; liga sozinho se o jogo nao chamar nada em 2 s, para ver no navegador).
+  Equipe: staff.json ao lado desta pagina, gerado pelo tools/staff.js do nGc.BR a partir dos grupos do ULX; sem ele, o bloco some.
 -->
 <style>
 @font-face { font-family: "Chakra"; src: url("fonts/ChakraPetch-Bold.ttf"); font-weight: 700; }
@@ -32,6 +33,9 @@
 	--human: #3ca0f0;
 	--zombie: #46c83c;
 	--cut: 18px;
+	--owner: 233, 185, 73;    /* role colors of the game (ZE.Roles.Tiers): Dono, Admin, Staff */
+	--admin: 230, 60, 60;
+	--staff: 40, 205, 150;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -144,6 +148,26 @@ body.v-a #A, body.v-b #B, body.v-c #C { display: block; }
 #C .side .keys { margin-top: 40px; }
 #C .server .name { font-size: 16px; margin-top: 6px; }
 
+/* team (staff.json, written by nGc.BR tools/staff.js): avatar, name and role chip; hidden when the list is missing or empty */
+.teambox { display: none; }
+body.has-team .teambox { display: block; }
+.teambox > .label { margin-bottom: 12px; }
+.team { display: flex; flex-direction: column; gap: 10px; }
+.mem { display: flex; align-items: center; gap: 12px; min-width: 0; --rc: var(--staff); }
+.mem.r-owner { --rc: var(--owner); }
+.mem.r-admin { --rc: var(--admin); }
+.mem .av { width: 40px; height: 40px; flex: none; background: #0d0e09 center / cover no-repeat; border: 1px solid rgba(var(--rc), 0.7); }
+.mem .av.none { background: repeating-linear-gradient(135deg, rgba(var(--rc), 0.25) 0 6px, rgba(0,0,0,0) 6px 12px), #0d0e09; }
+.mem .who { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.mem .nm { font-size: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mem .chip { font-size: 11px; padding: 2px 7px; background: rgba(var(--rc), 0.16); color: rgb(var(--rc)); }
+#A .teambox { padding-top: 22px; margin-top: 24px; border-top: 1px solid var(--line); }
+#A .team { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 24px; }
+#A .mem.first { grid-column-start: 1; }   /* each role starts a row */
+#B .teambox { position: absolute; right: 56px; top: 140px; width: 300px; }
+#C .teambox { position: absolute; right: 70px; top: 54px; width: 320px; }
+#B .teambox .nm, #C .teambox .nm { text-shadow: 0 2px 10px rgba(0,0,0,0.7); }
+
 /* variant switcher, only in demo (to compare in a normal browser) */
 #vs { position: fixed; right: 12px; bottom: 12px; display: none; gap: 6px; z-index: 9; }
 #vs a { font-family: "Chakra"; font-weight: 700; color: var(--text); background: rgba(0,0,0,0.6); border: 1px solid var(--border);
@@ -177,6 +201,7 @@ body.demo #vs { display: flex; }
 			<div class="tipbox"><div class="label">dica</div><div class="tip" data-f="tip"></div></div>
 			<div><div class="label">teclas</div><div class="keys" data-f="keys" style="flex-direction:column;gap:8px"></div></div>
 		</div>
+		<div class="teambox"><div class="label">equipe</div><div class="team" data-f="team"></div></div>
 	</div></div>
 </div>
 
@@ -184,6 +209,7 @@ body.demo #vs { display: flex; }
 <div class="layout" id="B">
 	<div class="top brand"><div class="mark"></div><div><div class="title">nGc.BR</div><div class="label">zombie escape</div></div></div>
 	<div class="server"><div class="label">servidor</div><div class="name" data-f="server">nGc.BR Zombie Escape</div></div>
+	<div class="teambox"><div class="label">equipe</div><div class="team" data-f="team"></div></div>
 	<div class="mapbig"><div class="label">carregando o mapa</div><div class="title map-name" data-f="map" style="margin-top:10px">...</div><div class="map-raw" data-f="mapraw"></div></div>
 	<div class="band"><div class="cols">
 		<div>
@@ -214,6 +240,7 @@ body.demo #vs { display: flex; }
 		</div>
 		<div class="server"><div class="label">servidor</div><div class="name" data-f="server">nGc.BR Zombie Escape</div></div>
 	</div></div></div>
+	<div class="teambox"><div class="label">equipe</div><div class="team" data-f="team"></div></div>
 	<div class="side">
 		<div class="label">dica</div>
 		<div class="tip" data-f="tip"></div>
@@ -369,6 +396,36 @@ body.demo #vs { display: flex; }
 	if (q.map) setMap(q.map);
 	setProgress(0);
 
+	// team: staff.json next to this page (nGc.BR tools/staff.js, from the server's ULX groups), already in the order Dono, Admin, Staff
+	var ROLES = { owner: "Dono", admin: "Admin", staff: "Staff" };
+	function showTeam(list) {
+		list = (list || []).filter(function (m) { return m && m.name && ROLES[m.role]; });
+		if (!list.length) return;
+		var holders = all("team");
+		for (var h = 0; h < holders.length; h++) {
+			for (var i = 0; i < list.length; i++) {
+				var m = list[i];
+				var row = document.createElement("div"); row.className = "mem r-" + m.role + (i && list[i - 1].role === m.role ? "" : " first");
+				var av = document.createElement("div"); av.className = "av";
+				if (/^https:\/\/[^'"()\\\s]+$/.test(m.avatar || "")) av.style.backgroundImage = "url('" + m.avatar + "')"; else av.className = "av none";
+				var who = document.createElement("div"); who.className = "who";
+				var nm = document.createElement("div"); nm.className = "nm"; nm.textContent = m.name;
+				var chip = document.createElement("span"); chip.className = "chip"; chip.textContent = ROLES[m.role];
+				who.appendChild(nm); who.appendChild(chip); row.appendChild(av); row.appendChild(who); holders[h].appendChild(row);
+			}
+		}
+		document.body.className += " has-team";
+	}
+	(function () {
+		var x = new XMLHttpRequest();
+		x.open("GET", "staff.json?t=" + Date.now());   // GitHub Pages caches for 10 min; a role change should show at once
+		x.onload = function () {
+			if (x.status !== 200) return;
+			try { showTeam(JSON.parse(x.responseText).staff); } catch (e) {}
+		};
+		x.send();
+	})();
+
 	// demo: the game did not call us (normal browser) or demo=1 was asked
 	var live = false;
 	function demo() {
@@ -395,7 +452,8 @@ body.demo #vs { display: flex; }
 	var vs = document.querySelectorAll("#vs a");
 	for (var a = 0; a < vs.length; a++) vs[a].onclick = function (e) {
 		e.preventDefault();
-		document.body.className = "v-" + this.getAttribute("data-v") + " demo";
+		var team = /\bhas-team\b/.test(document.body.className) ? " has-team" : "";
+		document.body.className = "v-" + this.getAttribute("data-v") + " demo" + team;
 	};
 })();
 </script>
