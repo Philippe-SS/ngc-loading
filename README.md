@@ -4,7 +4,11 @@ Tela de carregamento do servidor nGc.BR Zombie Escape (Garry's Mod), no mesmo vi
 
 - Publicada pelo GitHub Pages em `https://philippe-ss.github.io/ngc-loading/`.
 - No servidor: `sv_loadingurl "https://philippe-ss.github.io/ngc-loading/?map=%m&sid=%s"`.
-- `?v=a|b|c` escolhe o layout (propostas em teste); `?demo=1` simula o carregamento para ver no navegador.
+- Um painel só (o antigo layout A; os layouts B e C saíram em 2026-10-19), desenhado para 1920x1080 e escalado para caber na tela.
+  `?demo=1` simula o carregamento para ver no navegador.
+- Dicas em `TIPS` dentro do `index.html` (etiqueta humano, zumbi ou geral). Regra do dono: só o que o jogador faz, nunca como o jogo
+  funciona por dentro nem quem liga o quê.
+- Bloco "Novidades" lido de `news.json` (os quatro primeiros itens, `title` e `text`). Sem o arquivo, o bloco some.
 - O GMod chama `GameDetails`, `SetStatusChanged`, `SetFilesTotal`, `SetFilesNeeded` e `DownloadingFile`; tudo em `index.html`.
 - Bloco "Equipe" (donos, admins e staffs, com avatar e cargo nas cores do jogo) lido de `staff.json`. Sem o arquivo, ou com a
   lista vazia, o bloco some.
