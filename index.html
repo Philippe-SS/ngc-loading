@@ -9,9 +9,12 @@
   painel escuro oliva, canto cortado, faixa listrada ambar e preta, azul dos humanos, verde dos zumbis).
   The game browser is Chrome 86 (GMod/13): no "inset" (use top/right/bottom/left); gap and min() are fine.
   O GMod chama as funcoes globais GameDetails, SetStatusChanged, SetFilesTotal, SetFilesNeeded e DownloadingFile.
-  Parametros da URL: v=a|b|c (layout), map=<mapa> e sid=<steamid64> (o servidor pode passar %m e %s), demo=1 (simula
-  o carregamento; liga sozinho se o jogo nao chamar nada em 2 s, para ver no navegador).
-  Equipe: staff.json ao lado desta pagina, gerado pelo tools/staff.js do nGc.BR a partir dos grupos do ULX; sem ele, o bloco some.
+  Parametros da URL: map=<mapa> e sid=<steamid64> (o servidor passa %m e %s), demo=1 (simula o carregamento; liga sozinho se o
+  jogo nao chamar nada em 2 s, para ver no navegador).
+  Arquivos ao lado desta pagina: staff.json (equipe, gerado pelo tools/staff.js do nGc.BR a partir dos grupos do ULX) e news.json
+  (novidades, escrito a mao a cada atualizacao grande). Sem um deles, o bloco dele some.
+  Um painel so (o antigo layout A, escolhido pelo dono em 2026-10-19; os layouts B e C sairam). O painel e desenhado para 1920x1080
+  e escala para caber em qualquer tela (fit()).
 -->
 <style>
 @font-face { font-family: "Chakra"; src: url("fonts/ChakraPetch-Bold.ttf"); font-weight: 700; }
@@ -32,10 +35,13 @@
 	--hazard2: #16170f;
 	--human: #3ca0f0;
 	--zombie: #46c83c;
-	--cut: 18px;
+	--cut: 20px;
 	--owner: 233, 185, 73;    /* role colors of the game (ZE.Roles.Tiers): Dono, Admin, Staff */
 	--admin: 230, 60, 60;
 	--staff: 40, 205, 150;
+	--gold: 227, 174, 58;     /* key groups, same as the F1 key map: menus, human, zombie */
+	--hum: 60, 160, 240;
+	--zom: 70, 200, 60;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -75,84 +81,77 @@ body {
 	background: repeating-linear-gradient(135deg, var(--hazard) 0 7px, var(--hazard2) 7px 14px);
 	clip-path: polygon(var(--cut) 0, 100% 0, 100% 100%, calc(var(--cut) - 6px) 100%); }
 
-/* team mark: amber striped block next to the title */
+/* the panel: drawn at 1280 px wide and scaled to the screen by fit() */
+#panel { position: absolute; left: 50%; top: 50%; width: 1280px; transform-origin: 50% 50%; transform: translate(-50%, -50%); }
+#panel .in { padding: 34px 44px 26px; }
+.sec { border-bottom: 1px solid var(--line); }
+
+/* head: brand on the left, what the server is on the right */
+.head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 22px; }
 .mark { width: 22px; height: 52px; flex: none;
 	background: repeating-linear-gradient(135deg, var(--hazard) 0 6px, transparent 6px 12px); }
 .brand { display: flex; align-items: center; gap: 16px; }
 .brand .title { font-size: 46px; text-transform: none; }   /* the clan writes it nGc.BR */
 .brand .label { margin-top: 6px; }
+.head .side { text-align: right; }
+.head .side .label { color: var(--faint); }
+.head .side .what { font-size: 16px; color: var(--dim); margin-top: 6px; }
 
+/* map and progress */
+.mid { display: flex; gap: 34px; padding: 26px 0; }
+.thumb { width: 512px; height: 288px; flex: none; background: #0d0e09 center / cover no-repeat; position: relative; }
+.thumb.none { background: repeating-linear-gradient(135deg, rgba(227,174,58,0.10) 0 14px, rgba(0,0,0,0) 14px 28px), #0d0e09; }
+.thumb::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+	background: repeating-linear-gradient(135deg, var(--hazard) 0 7px, var(--hazard2) 7px 14px); opacity: 0.8; }
+.info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; padding: 6px 0 2px; }
+.map-name { font-size: 64px; margin-top: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-bottom: 4px; }
+.prog-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; gap: 16px; }
+.status { font-size: 18px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pct { font-family: "Chakra"; font-weight: 700; font-size: 30px; color: var(--hazard); }
 /* progress: blocks like the admin winrate bar; the block where it is filling is painted in proportion */
-.blocks { display: flex; gap: 4px; height: 12px; }
+.blocks { display: flex; gap: 4px; height: 14px; }
 .blocks i { flex: 1; background: rgba(255,255,255,0.08); position: relative; overflow: hidden; }
 .blocks i b { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--hazard); transition: width 0.25s; }
-.prog-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; gap: 16px; }
-.status { font-size: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pct { font-family: "Chakra"; font-weight: 700; font-size: 26px; color: var(--hazard); }
-.file { font-size: 13px; color: var(--faint); margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 18px; }
+.sub { display: flex; justify-content: space-between; gap: 20px; margin-top: 10px; font-size: 14px; color: var(--faint); min-height: 20px; }
+.first { color: var(--dim); opacity: 0; transition: opacity 0.6s; }
+.first.on { opacity: 1; }
 
-.map-name { font-size: 40px; }
-.map-raw { font-size: 14px; color: var(--faint); margin-top: 6px; }
-.thumb { background: #0d0e09 center / cover no-repeat; position: relative; }
-.thumb.none { background: repeating-linear-gradient(135deg, rgba(227,174,58,0.10) 0 14px, rgba(0,0,0,0) 14px 28px), #0d0e09; }
+/* tip and keys */
+.foot { display: flex; gap: 40px; padding: 24px 0; }
+.tipbox { flex: 1; min-width: 0; }
+.tiphead { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.tip { font-size: 22px; line-height: 1.45; color: var(--text); min-height: 64px; transition: opacity 0.4s; }
+.tip.fade, .tag.fade { opacity: 0; }
+.tag { font-family: "Chakra"; font-weight: 700; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+	padding: 3px 9px; transition: opacity 0.4s; --tc: var(--gold); background: rgba(var(--tc), 0.18); color: rgb(var(--tc)); }
+.tag.h { --tc: var(--hum); }
+.tag.z { --tc: var(--zom); }
+.keysbox { flex: none; width: 470px; }
+.keysbox > .label { margin-bottom: 14px; }
+.keys { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 22px; }
+.key { display: flex; align-items: center; gap: 12px; font-size: 15px; color: var(--dim); white-space: nowrap; }
+.key kbd { font-family: "Chakra"; font-weight: 700; font-size: 15px; color: var(--text); min-width: 44px; height: 32px; padding: 0 8px;
+	display: inline-flex; align-items: center; justify-content: center; --kc: var(--gold);
+	border: 1px solid rgba(var(--kc), 0.85); border-bottom-width: 3px; background: rgba(var(--kc), 0.16); }
+.key.a kbd { --kc: var(--hum); }
+.key.z kbd { --kc: var(--zom); }
+.key.b kbd { border-color: rgba(255,255,255,0.6);
+	background: linear-gradient(90deg, rgba(var(--hum), 0.30) 50%, rgba(var(--zom), 0.30) 50%); }
 
-.tip { font-size: 19px; line-height: 1.45; color: var(--text); min-height: 56px; transition: opacity 0.4s; }
-.tip.fade { opacity: 0; }
-.keys { display: flex; flex-wrap: wrap; gap: 10px 22px; }
-.key { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--dim); }
-.key kbd { font-family: "Chakra"; font-weight: 700; font-size: 15px; color: var(--text); min-width: 34px; height: 32px; padding: 0 8px;
-	display: inline-flex; align-items: center; justify-content: center;
-	border: 1px solid rgba(255,255,255,0.28); border-bottom-width: 3px; background: rgba(255,255,255,0.04); }
-.chip { font-family: "Chakra"; font-weight: 600; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
-	padding: 4px 9px; background: rgba(227,174,58,0.18); color: var(--hazard); display: inline-block; }
-
-.layout { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; }
-body.v-a #A, body.v-b #B, body.v-c #C { display: block; }
-
-/* A: one centred panel ---------------------------------------------------------------------------- */
-#A .cut { position: absolute; left: 50%; top: 50%; width: min(1000px, 92vw); transform: translate(-50%, -50%); }
-#A .in { padding: 34px 40px 30px; }
-#A .head { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
-#A .server { text-align: right; max-width: 45%; }
-#A .server .name { font-size: 16px; color: var(--text); margin-top: 6px; }
-#A .mid { display: flex; gap: 28px; padding: 26px 0; border-bottom: 1px solid var(--line); }
-#A .thumb { width: 300px; height: 169px; flex: none; }
-#A .mid .info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
-#A .foot { display: flex; gap: 36px; padding-top: 24px; align-items: flex-start; }
-#A .foot .tipbox { flex: 1; }
-#A .foot .label { margin-bottom: 10px; }
-
-/* B: the map full screen, a band at the bottom ------------------------------------------------------ */
-#B .top { position: absolute; left: 56px; top: 48px; }
-#B .server { position: absolute; right: 56px; top: 54px; text-align: right; }
-#B .server .name { font-size: 16px; margin-top: 6px; }
-#B .mapbig { position: absolute; left: 56px; bottom: 250px; }
-#B .mapbig .map-name { font-size: 72px; text-shadow: 0 3px 18px rgba(0,0,0,0.7); }
-#B .band { position: absolute; left: 0; right: 0; bottom: 0; height: 210px;
-	background: linear-gradient(rgba(20,22,15,0.92), rgba(20,22,15,0.97)); border-top: 1px solid var(--border); }
-#B .band::before { content: ""; position: absolute; left: 0; right: 0; top: -7px; height: 6px;
-	background: repeating-linear-gradient(135deg, var(--hazard) 0 7px, var(--hazard2) 7px 14px); }
-#B .cols { display: flex; gap: 56px; padding: 34px 56px; height: 100%; }
-#B .cols > div { flex: 1; min-width: 0; }
-#B .cols .label { margin-bottom: 12px; }
-
-/* C: a column on the left, keys and tip on the right ------------------------------------------------- */
-#C .col { position: absolute; left: 0; top: 0; bottom: 0; width: 520px; }
-#C .col .cut { height: 100%; --cut: 26px; }
-#C .col .in { padding: 54px 44px 40px; display: flex; flex-direction: column; gap: 34px; }
-#C .thumb { width: 100%; height: 240px; }
-#C .grow { flex: 1; }
-#C .side { position: absolute; left: 600px; right: 70px; bottom: 80px; }
-#C .side .tip { font-size: 26px; max-width: 900px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); }
-#C .side .label { margin-bottom: 14px; }
-#C .side .keys { margin-top: 40px; }
-#C .server .name { font-size: 16px; margin-top: 6px; }
+/* news and team */
+.row { display: flex; gap: 40px; padding: 22px 0; }
+.newsbox { flex: 1; min-width: 0; display: none; }
+body.has-news .newsbox { display: block; }
+.newsbox > .label, .teambox > .label { margin-bottom: 14px; }
+.news { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 30px; }
+.nw { border-left: 3px solid var(--hazard); padding: 2px 0 2px 14px; min-width: 0; }
+.nw .t { font-family: "Chakra"; font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text); }
+.nw .d { font-size: 14px; line-height: 1.4; color: var(--dim); margin-top: 3px; }
 
 /* team (staff.json, written by nGc.BR tools/staff.js): avatar, name and role chip; hidden when the list is missing or empty */
-.teambox { display: none; }
+.teambox { display: none; flex: none; width: 470px; }
 body.has-team .teambox { display: block; }
-.teambox > .label { margin-bottom: 12px; }
-.team { display: flex; flex-direction: column; gap: 10px; }
+.team { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; }
 .mem { display: flex; align-items: center; gap: 12px; min-width: 0; --rc: var(--staff); }
 .mem.r-owner { --rc: var(--owner); }
 .mem.r-admin { --rc: var(--admin); }
@@ -160,95 +159,51 @@ body.has-team .teambox { display: block; }
 .mem .av.none { background: repeating-linear-gradient(135deg, rgba(var(--rc), 0.25) 0 6px, rgba(0,0,0,0) 6px 12px), #0d0e09; }
 .mem .who { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .mem .nm { font-size: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.mem .chip { font-size: 11px; padding: 2px 7px; background: rgba(var(--rc), 0.16); color: rgb(var(--rc)); }
-#A .teambox { padding-top: 22px; margin-top: 24px; border-top: 1px solid var(--line); }
-#A .team { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 24px; }
-#A .mem.first { grid-column-start: 1; }   /* each role starts a row */
-#B .teambox { position: absolute; right: 56px; top: 140px; width: 300px; }
-#C .teambox { position: absolute; right: 70px; top: 54px; width: 320px; }
-#B .teambox .nm, #C .teambox .nm { text-shadow: 0 2px 10px rgba(0,0,0,0.7); }
+.chip { font-family: "Chakra"; font-weight: 600; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+	padding: 2px 7px; background: rgba(var(--rc), 0.16); color: rgb(var(--rc)); display: inline-block; }
 
-/* variant switcher, only in demo (to compare in a normal browser) */
-#vs { position: fixed; right: 12px; bottom: 12px; display: none; gap: 6px; z-index: 9; }
-#vs a { font-family: "Chakra"; font-weight: 700; color: var(--text); background: rgba(0,0,0,0.6); border: 1px solid var(--border);
-	padding: 6px 12px; text-decoration: none; }
-body.demo #vs { display: flex; }
+/* bottom line: Discord and the short rules */
+.bottom { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding-top: 18px; font-size: 14px; color: var(--dim); }
+.bottom b { font-family: "Chakra"; font-weight: 700; color: var(--hazard); letter-spacing: 0.04em; font-size: 15px; }
+.bottom .rules { color: var(--faint); text-align: right; }
 </style>
 </head>
-<body class="v-a">
+<body>
 <div id="bgimg"></div>
 <div id="bgtex"></div>
 
-<!-- A -->
-<div class="layout" id="A">
-	<div class="cut"><div class="strip"></div><div class="in">
-		<div class="head">
-			<div class="brand"><div class="mark"></div><div><div class="title">nGc.BR</div><div class="label">zombie escape</div></div></div>
-			<div class="server"><div class="label">servidor</div><div class="name" data-f="server">nGc.BR Zombie Escape</div></div>
-		</div>
-		<div class="mid">
-			<div class="thumb none" data-f="thumb"></div>
-			<div class="info">
-				<div><div class="label">carregando o mapa</div><div class="title map-name" data-f="map" style="margin-top:10px">...</div><div class="map-raw" data-f="mapraw"></div></div>
-				<div>
-					<div class="prog-row"><div class="status" data-f="status">Conectando ao servidor</div><div class="pct" data-f="pct">0%</div></div>
-					<div class="blocks" data-f="blocks"></div>
-					<div class="file" data-f="file"></div>
-				</div>
+<div class="cut" id="panel"><div class="strip"></div><div class="in">
+	<div class="head sec">
+		<div class="brand"><div class="mark"></div><div><div class="title">nGc.BR</div><div class="label">zombie escape</div></div></div>
+		<div class="side"><div class="label">servidor brasileiro</div><div class="what">humanos fogem, zumbis infectam</div></div>
+	</div>
+	<div class="mid sec">
+		<div class="thumb none" id="thumb"></div>
+		<div class="info">
+			<div><div class="label">carregando o mapa</div><div class="title map-name" id="map">...</div></div>
+			<div>
+				<div class="prog-row"><div class="status" id="status">Conectando ao servidor</div><div class="pct" id="pct">0%</div></div>
+				<div class="blocks" id="blocks"></div>
+				<div class="sub"><span id="count"></span><span class="first" id="first">Primeira vez aqui? O download (cerca de 700 MB) só acontece uma vez.</span></div>
 			</div>
 		</div>
-		<div class="foot">
-			<div class="tipbox"><div class="label">dica</div><div class="tip" data-f="tip"></div></div>
-			<div><div class="label">teclas</div><div class="keys" data-f="keys" style="flex-direction:column;gap:8px"></div></div>
-		</div>
-		<div class="teambox"><div class="label">equipe</div><div class="team" data-f="team"></div></div>
-	</div></div>
-</div>
-
-<!-- B -->
-<div class="layout" id="B">
-	<div class="top brand"><div class="mark"></div><div><div class="title">nGc.BR</div><div class="label">zombie escape</div></div></div>
-	<div class="server"><div class="label">servidor</div><div class="name" data-f="server">nGc.BR Zombie Escape</div></div>
-	<div class="teambox"><div class="label">equipe</div><div class="team" data-f="team"></div></div>
-	<div class="mapbig"><div class="label">carregando o mapa</div><div class="title map-name" data-f="map" style="margin-top:10px">...</div><div class="map-raw" data-f="mapraw"></div></div>
-	<div class="band"><div class="cols">
-		<div>
-			<div class="prog-row"><div class="status" data-f="status">Conectando ao servidor</div><div class="pct" data-f="pct">0%</div></div>
-			<div class="blocks" data-f="blocks"></div>
-			<div class="file" data-f="file"></div>
-		</div>
-		<div><div class="label">dica</div><div class="tip" data-f="tip"></div></div>
-		<div style="flex:0.7"><div class="label">teclas</div><div class="keys" data-f="keys"></div></div>
-	</div></div>
-</div>
-
-<!-- C -->
-<div class="layout" id="C">
-	<div class="col"><div class="cut"><div class="strip"></div><div class="in">
-		<div class="brand"><div class="mark"></div><div><div class="title">nGc.BR</div><div class="label">zombie escape</div></div></div>
-		<div>
-			<div class="thumb none" data-f="thumb"></div>
-			<div class="label" style="margin-top:18px">carregando o mapa</div>
-			<div class="title map-name" data-f="map" style="margin-top:8px;font-size:34px">...</div>
-			<div class="map-raw" data-f="mapraw"></div>
-		</div>
-		<div class="grow"></div>
-		<div>
-			<div class="prog-row"><div class="status" data-f="status">Conectando ao servidor</div><div class="pct" data-f="pct">0%</div></div>
-			<div class="blocks" data-f="blocks"></div>
-			<div class="file" data-f="file"></div>
-		</div>
-		<div class="server"><div class="label">servidor</div><div class="name" data-f="server">nGc.BR Zombie Escape</div></div>
-	</div></div></div>
-	<div class="teambox"><div class="label">equipe</div><div class="team" data-f="team"></div></div>
-	<div class="side">
-		<div class="label">dica</div>
-		<div class="tip" data-f="tip"></div>
-		<div class="keys" data-f="keys"></div>
 	</div>
-</div>
-
-<div id="vs"><a href="#" data-v="a">A</a><a href="#" data-v="b">B</a><a href="#" data-v="c">C</a></div>
+	<div class="foot sec">
+		<div class="tipbox">
+			<div class="tiphead"><div class="label">dica</div><span class="tag" id="tag"></span></div>
+			<div class="tip" id="tip"></div>
+		</div>
+		<div class="keysbox"><div class="label">teclas</div><div class="keys" id="keys"></div></div>
+	</div>
+	<div class="row sec">
+		<div class="newsbox"><div class="label">novidades</div><div class="news" id="news"></div></div>
+		<div class="teambox"><div class="label">equipe</div><div class="team" id="team"></div></div>
+	</div>
+	<div class="bottom">
+		<div>Discord <b>discord.gg/F3RnY9HHVH</b></div>
+		<div class="rules">Respeito a todos · sem trapaça · sem spam · <span style="color:var(--dim)">!regras</span> no chat</div>
+	</div>
+</div></div>
 
 <script>
 (function () {
@@ -258,81 +213,93 @@ body.demo #vs { display: flex; }
 		var p = kv.split("=");
 		q[decodeURIComponent(p[0])] = decodeURIComponent((p[1] || "").replace(/\+/g, " "));
 	});
+	function $(id) { return document.getElementById(id); }
 
-	var variant = /^[abc]$/.test(q.v || "") ? q.v : "a";
-	document.body.className = "v-" + variant;
-
-	// Map pictures (maps/<file>); anything else gets the striped placeholder. MAP_ALIAS: a map that should show another one's photo.
-	// Photos taken in the lab (nGc.BR tools/maps/scenic.sh), one picked per map, 1280x720.
+	// Map names as the game shows them (nGc.BR maps/sh_mapnames.lua, MN.List): keep both lists the same.
+	var MAP_NAMES = {
+		ze_dark_souls: "Dark Souls", ze_death_star_escape_v4_3: "Death Star Escape", ze_fapescape_rote_v1_3f: "FAPescape: ROTE",
+		ze_ffvii_mako_reactor_v5_3: "Mako Reactor", ze_icecap_escape_v5: "Icecap Escape", ze_isla_nublar_v2_1: "Isla Nublar",
+		ze_jurassicpark_v2: "Jurassic Park", ze_lotr_minas_tirith_v3_3: "Minas Tirith", ze_lotr_mount_doom_ngc: "Mount Doom (nGc)",
+		ze_lotr_mount_doom_v3: "Mount Doom", ze_minecraft_v1_1: "Minecraft", ze_mirrors_edge_reborn_v4_2: "Mirror's Edge Reborn",
+		ze_outlast_v1: "Outlast", ze_pirates_port_royal_v5_4s2: "Pirates: Port Royal", ze_predator_ultimate_v3: "Predator Ultimate",
+		ze_shroomforest2_v1: "Shroom Forest 2", ze_sunlight_v2_0: "Sunlight", ze_venice_escape_b2: "Venice Escape"
+	};
+	// Map pictures (maps/<file>, 1280x720, taken by the owner in the game); anything else gets the striped placeholder.
+	// MAP_ALIAS: a map that shows another one's photo.
 	var MAP_PICS = {};
-	// every photo taken by the owner in the game (2026-10-14), 1280x720
 	["ze_dark_souls", "ze_death_star_escape_v4_3", "ze_fapescape_rote_v1_3f", "ze_ffvii_mako_reactor_v5_3", "ze_isla_nublar_v2_1",
 		"ze_jurassicpark_v2", "ze_lotr_minas_tirith_v3_3", "ze_lotr_mount_doom_ngc", "ze_minecraft_v1_1", "ze_mirrors_edge_reborn_v4_2",
 		"ze_outlast_v1", "ze_pirates_port_royal_v5_4s2", "ze_predator_ultimate_v3",
 		"ze_venice_escape_b2", "ze_sunlight_v2_0", "ze_icecap_escape_v5", "ze_shroomforest2_v1"].forEach(function (m) { MAP_PICS[m] = m + ".jpg"; });
-	var MAP_ALIAS = {};
+	var MAP_ALIAS = { ze_lotr_mount_doom_v3: "ze_lotr_mount_doom_ngc" };
 
+	// Tips: [group, text]. h = humano (blue), z = zumbi (green), g = geral (amber). Player words only: what to do, never how the
+	// game works inside (owner, 2026-10-19). Shuffled once, one every 7 s.
 	var TIPS = [
-		"B abre a loja. As armas normais são grátis, mas só chegam nos primeiros segundos do round.",
-		"Zumbi: o botão direito usa a habilidade da sua classe.",
-		"F3 escolhe a sua classe de zumbi. A escolha vale no próximo spawn.",
-		"Todo mundo tem pulo duplo: aperte pular de novo no ar.",
-		"Tiro empurra zumbi. Em grupo, vocês seguram qualquer passagem.",
-		"O colete aguenta uma infecção e depois quebra.",
-		"Granada de gelo congela; a de fogo queima e deixa o zumbi lento.",
-		"Sobreviveu ao round? Você volta com o mesmo equipamento.",
-		"As mensagens do mapa aparecem no painel MAPA, à esquerda da tela.",
-		"F2 abre as opções: tamanho do HUD, sons, teclas e efeitos.",
-		"C personaliza a arma na mão. Salve a montagem e pegue de novo na loja."
+		["g", "B abre a loja. As armas normais são grátis, mas só chegam nos primeiros 15 segundos do round."],
+		["g", "Todo mundo tem pulo duplo: aperte pular de novo no ar."],
+		["g", "As mensagens do mapa aparecem no painel MAPA, à esquerda da tela."],
+		["g", "F2 abre as opções: tamanho do HUD, sons, teclas e efeitos."],
+		["g", "Uma classe de zumbi nova a cada 5 níveis: Tanque, Corredor, Saltador, Cientista e, no nível 25, o Predador."],
+		["g", "XP vem de jogar o round inteiro, matar zumbis, infectar humanos e escapar. !xp mostra o seu nível."],
+		["g", "Preso numa parede ou em outro jogador? Digite !zstuck no chat."],
+		["g", "!rtv pede a troca de mapa e !nom indica um para a votação (exemplo: !nom mako)."],
+		["g", "Entrou no meio do round? !zspawn coloca você no jogo como zumbi."],
+		["g", "!report nome motivo avisa a staff que está online."],
+		["g", "Fim de semana grátis: quando a staff liga, todas as classes de zumbi ficam liberadas."],
+		["h", "Tiro empurra zumbi. Em grupo, vocês seguram qualquer passagem."],
+		["h", "O colete aguenta uma infecção e depois quebra."],
+		["h", "Sobreviveu ao round? Você volta com o mesmo equipamento. Na troca de mapa, começa de novo."],
+		["h", "C personaliza a arma na mão. Salve a montagem e pegue de novo na loja."],
+		["h", "Pegou um item do mapa (cajado, matéria, sabre)? O botão direito usa o poder dele."],
+		["h", "Escolheu a arma depois dos 15 segundos? Ela vem no próximo round."],
+		["h", "Recomprar devolve o equipamento salvo por 60% do preço, no começo do round."],
+		["h", "Aniquiladora e Ultima: só uma de cada por round para o time inteiro. Combine com o grupo antes de comprar."],
+		["h", "Granada: o botão direito troca entre explodir no tempo e explodir ao tocar."],
+		["h", "A Singularidade puxa os zumbis para o meio dela. Jogue numa passagem estreita."],
+		["h", "Cada zumbi que você mata no round vale mais pontos que o anterior."],
+		["h", "Nos primeiros segundos do round, com todos parados, granada e mina não saem."],
+		["z", "Zumbi: o botão direito usa a habilidade da sua classe."],
+		["z", "F3 escolhe a sua classe de zumbi. Todos começam com o Clássico; as outras liberam com o nível."],
+		["z", "Zumbi: N liga a visão térmica."],
+		["z", "Congelado, o zumbi não ataca nem usa a habilidade. Cuidado com o gelo."],
+		["z", "A habilidade só começa a recarregar quando o efeito dela termina."],
+		["z", "Infecções em sequência valem cada vez mais pontos."]
 	];
-	var KEYS = [["F1", "ajuda"], ["B", "loja"], ["F2", "opções"], ["F3", "classe de zumbi"], ["C", "personalizar arma"]];
+	var TAGS = { h: "humano", z: "zumbi", g: "geral" };
+	// Keys: [key, text, group]. Groups as in the F1 key map: m menus (amber), a human (blue), z zombie (green), b both (split).
+	var KEYS = [["F1", "ajuda", "m"], ["F2", "opções", "m"], ["B", "loja", "m"], ["F3", "classe de zumbi", "m"],
+		["C", "acessórios da arma", "a"], ["N", "modo de tiro · visão", "b"], ["Tab", "placar", "m"], ["F6", "menu VIP", "m"]];
 
-	function all(f) { return document.querySelectorAll('[data-f="' + f + '"]'); }
-	function setText(f, t) { var e = all(f); for (var i = 0; i < e.length; i++) e[i].textContent = t; }
-
-	// map name: "ze_lotr_minas_tirith_v3_3" -> "LOTR MINAS TIRITH"
+	// map name: the game's name, or "ze_some_map_v2" -> "Some Map"
 	function prettyMap(m) {
-		var s = String(m || "").replace(/^ze_/i, "").replace(/_v\d.*$/i, "").replace(/_(b|beta|final|fix)\d*$/i, "");
-		return s.replace(/_/g, " ").trim() || m;
+		var s = String(m || "").toLowerCase().replace(/^ze_/, "").replace(/_v\d.*$/, "").replace(/_(b|beta|final|fix)\d*\w*$/, "");
+		s = s.replace(/_/g, " ").trim();
+		return s ? s.replace(/\b\w/g, function (c) { return c.toUpperCase(); }) : m;
 	}
 	function setMap(m) {
 		if (!m) return;
-		setText("map", prettyMap(m));
-		setText("mapraw", m);
-		var t = all("thumb");
+		m = String(m).toLowerCase();
+		$("map").textContent = MAP_NAMES[m] || prettyMap(m);
 		var key = MAP_ALIAS[m] || m;
-		var pic = MAP_PICS[key] ? "maps/" + MAP_PICS[key] : null;
-		for (var i = 0; i < t.length; i++) {
-			if (pic) { t[i].style.backgroundImage = "url('" + pic + "')"; t[i].className = "thumb"; }
-		}
-		var bg = document.getElementById("bgimg");
-		if (pic) { bg.style.backgroundImage = "url('" + pic + "')"; bg.className = "on"; }
+		if (!MAP_PICS[key]) return;
+		var pic = "url('maps/" + MAP_PICS[key] + "')";
+		$("thumb").style.backgroundImage = pic; $("thumb").className = "thumb";
+		$("bgimg").style.backgroundImage = pic; $("bgimg").className = "on";
 	}
 
 	// progress blocks
-	var NB = 20, blockEls = [];
-	(function () {
-		var holders = all("blocks");
-		for (var h = 0; h < holders.length; h++) {
-			var list = [];
-			for (var i = 0; i < NB; i++) {
-				var c = document.createElement("i"), b = document.createElement("b");
-				c.appendChild(b); holders[h].appendChild(c); list.push(b);
-			}
-			blockEls.push(list);
-		}
-	})();
+	var NB = 24, blockEls = [];
+	for (var i = 0; i < NB; i++) {
+		var c = document.createElement("i"), b = document.createElement("b");
+		c.appendChild(b); $("blocks").appendChild(c); blockEls.push(b);
+	}
 	var shown = 0;
 	function setProgress(p) {
 		p = Math.max(shown, Math.min(1, p));   // never goes back
 		shown = p;
-		for (var h = 0; h < blockEls.length; h++) {
-			for (var i = 0; i < NB; i++) {
-				var part = Math.max(0, Math.min(1, p * NB - i));
-				blockEls[h][i].style.width = (part * 100) + "%";
-			}
-		}
-		setText("pct", Math.round(p * 100) + "%");
+		for (var i = 0; i < NB; i++) blockEls[i].style.width = (Math.max(0, Math.min(1, p * NB - i)) * 100) + "%";
+		$("pct").textContent = Math.round(p * 100) + "%";
 	}
 
 	// engine status -> Portuguese, and a rough place on the bar when there is no file count
@@ -345,100 +312,120 @@ body.demo #vs { display: flex; }
 		[/(client info|server info|retriev|connect|sending|request)/i, "Conectando ao servidor", 0.05],
 		[/(complete|done|spawn)/i, "Quase lá", 0.95]
 	];
-	var filesTotal = 0, filesNeeded = 0;
-	function filesProgress() { return filesTotal > 0 ? (filesTotal - filesNeeded) / filesTotal : 0; }
+	var filesTotal = 0, filesNeeded = 0, live = false;
+	function showCount() {
+		if (filesTotal <= 0 || filesNeeded <= 0) { $("count").textContent = ""; $("first").className = "first"; return; }
+		$("count").textContent = "arquivo " + Math.min(filesTotal, filesTotal - filesNeeded + 1) + " de " + filesTotal;
+		$("first").className = "first on";
+	}
 
-	window.GameDetails = function (servername, serverurl, mapname, maxplayers, steamid, gamemode) {
-		live = true;
-		if (servername) setText("server", servername);
-		setMap(mapname);
-	};
+	window.GameDetails = function (servername, serverurl, mapname) { live = true; setMap(mapname); };
 	window.SetStatusChanged = function (status) {
 		live = true;
 		var txt = status, at = null;
 		for (var i = 0; i < STAGES.length; i++) {
 			if (STAGES[i][0].test(status)) { txt = STAGES[i][1]; at = STAGES[i][2]; break; }
 		}
-		setText("status", txt);
+		$("status").textContent = txt;
 		if (at !== null && filesTotal === 0) setProgress(at);
 	};
-	window.SetFilesTotal = function (n) { live = true; filesTotal = Number(n) || 0; };
+	window.SetFilesTotal = function (n) { live = true; filesTotal = Number(n) || 0; showCount(); };
 	window.SetFilesNeeded = function (n) {
 		live = true; filesNeeded = Number(n) || 0;
-		if (filesTotal > 0) setProgress(0.1 + filesProgress() * 0.8);
+		if (filesTotal > 0) setProgress(0.1 + (filesTotal - filesNeeded) / filesTotal * 0.8);
+		showCount();
 	};
-	window.DownloadingFile = function (f) { live = true; setText("file", f || ""); };
+	window.DownloadingFile = function () { live = true; };   // the file path is technical: the count above says enough
 
-	// tips: one every 7 s, with a fade
-	var tipEls = all("tip"), tipAt = Math.floor(Math.random() * TIPS.length);
+	// tips: shuffled, one every 7 s with a fade
+	for (var t = TIPS.length - 1; t > 0; t--) { var r = Math.floor(Math.random() * (t + 1)), tmp = TIPS[t]; TIPS[t] = TIPS[r]; TIPS[r] = tmp; }
+	var tipAt = 0;
 	function showTip() {
-		for (var i = 0; i < tipEls.length; i++) tipEls[i].textContent = TIPS[tipAt % TIPS.length];
+		var tp = TIPS[tipAt % TIPS.length];
+		$("tip").textContent = tp[1];
+		$("tag").textContent = TAGS[tp[0]];
+		$("tag").className = "tag " + tp[0];
 	}
 	showTip();
 	setInterval(function () {
-		for (var i = 0; i < tipEls.length; i++) tipEls[i].className = "tip fade";
-		setTimeout(function () {
-			tipAt++; showTip();
-			for (var i = 0; i < tipEls.length; i++) tipEls[i].className = "tip";
-		}, 400);
+		$("tip").className = "tip fade"; $("tag").className += " fade";
+		setTimeout(function () { tipAt++; showTip(); $("tip").className = "tip"; }, 400);
 	}, 7000);
 
 	// keys
-	var keyHolders = all("keys");
-	for (var k = 0; k < keyHolders.length; k++) {
-		for (var j = 0; j < KEYS.length; j++) {
-			var d = document.createElement("div"); d.className = "key";
-			d.innerHTML = "<kbd>" + KEYS[j][0] + "</kbd><span>" + KEYS[j][1] + "</span>";
-			keyHolders[k].appendChild(d);
-		}
+	for (var k = 0; k < KEYS.length; k++) {
+		var d = document.createElement("div"); d.className = "key " + KEYS[k][2];
+		var kb = document.createElement("kbd"); kb.textContent = KEYS[k][0];
+		var sp = document.createElement("span"); sp.textContent = KEYS[k][1];
+		d.appendChild(kb); d.appendChild(sp); $("keys").appendChild(d);
 	}
 
 	if (q.map) setMap(q.map);
 	setProgress(0);
 
-	// team: staff.json next to this page (nGc.BR tools/staff.js, from the server's ULX groups), already in the order Dono, Admin, Staff
-	var ROLES = { owner: "Dono", admin: "Admin", staff: "Staff" };
-	function showTeam(list) {
-		list = (list || []).filter(function (m) { return m && m.name && ROLES[m.role]; });
-		if (!list.length) return;
-		var holders = all("team");
-		for (var h = 0; h < holders.length; h++) {
-			for (var i = 0; i < list.length; i++) {
-				var m = list[i];
-				var row = document.createElement("div"); row.className = "mem r-" + m.role + (i && list[i - 1].role === m.role ? "" : " first");
-				var av = document.createElement("div"); av.className = "av";
-				if (/^https:\/\/[^'"()\\\s]+$/.test(m.avatar || "")) av.style.backgroundImage = "url('" + m.avatar + "')"; else av.className = "av none";
-				var who = document.createElement("div"); who.className = "who";
-				var nm = document.createElement("div"); nm.className = "nm"; nm.textContent = m.name;
-				var chip = document.createElement("span"); chip.className = "chip"; chip.textContent = ROLES[m.role];
-				who.appendChild(nm); who.appendChild(chip); row.appendChild(av); row.appendChild(who); holders[h].appendChild(row);
-			}
-		}
-		document.body.className += " has-team";
+	// scale the 1280 px panel to the screen (the game opens this page at the game's resolution)
+	function fit() {
+		var p = $("panel");
+		p.style.transform = "translate(-50%, -50%)";
+		var s = Math.min(window.innerWidth * 0.94 / p.offsetWidth, window.innerHeight * 0.94 / p.offsetHeight, 1.5);
+		p.style.transform = "translate(-50%, -50%) scale(" + s + ")";
 	}
-	(function () {
+	window.addEventListener("resize", fit);
+	setInterval(fit, 1000);   // the game can size the page after it loaded, without a resize event
+	fit();
+
+	function getJSON(file, done) {
 		var x = new XMLHttpRequest();
-		x.open("GET", "staff.json?t=" + Date.now());   // GitHub Pages caches for 10 min; a role change should show at once
+		x.open("GET", file + "?t=" + Date.now());   // GitHub Pages caches for 10 min; a change should show at once
 		x.onload = function () {
 			if (x.status !== 200) return;
-			try { showTeam(JSON.parse(x.responseText).staff); } catch (e) {}
+			try { done(JSON.parse(x.responseText)); fit(); } catch (e) {}
 		};
 		x.send();
-	})();
+	}
+
+	// team: staff.json (nGc.BR tools/staff.js, from the server's ULX groups), already in the order Dono, Admin, Staff
+	var ROLES = { owner: "Dono", admin: "Admin", staff: "Staff" };
+	getJSON("staff.json", function (data) {
+		var list = (data.staff || []).filter(function (m) { return m && m.name && ROLES[m.role]; });
+		if (!list.length) return;
+		for (var i = 0; i < list.length; i++) {
+			var m = list[i];
+			var row = document.createElement("div"); row.className = "mem r-" + m.role;
+			var av = document.createElement("div"); av.className = "av";
+			if (/^https:\/\/[^'"()\\\s]+$/.test(m.avatar || "")) av.style.backgroundImage = "url('" + m.avatar + "')"; else av.className = "av none";
+			var who = document.createElement("div"); who.className = "who";
+			var nm = document.createElement("div"); nm.className = "nm"; nm.textContent = m.name;
+			var chip = document.createElement("span"); chip.className = "chip"; chip.textContent = ROLES[m.role];
+			who.appendChild(nm); who.appendChild(chip); row.appendChild(av); row.appendChild(who); $("team").appendChild(row);
+		}
+		document.body.className += " has-team";
+	});
+
+	// news: news.json {"items": [{"title", "text"}]}, the first four
+	getJSON("news.json", function (data) {
+		var items = (data.items || []).filter(function (n) { return n && n.title; }).slice(0, 4);
+		if (!items.length) return;
+		for (var i = 0; i < items.length; i++) {
+			var nw = document.createElement("div"); nw.className = "nw";
+			var t = document.createElement("div"); t.className = "t"; t.textContent = items[i].title;
+			var d = document.createElement("div"); d.className = "d"; d.textContent = items[i].text || "";
+			nw.appendChild(t); nw.appendChild(d); $("news").appendChild(nw);
+		}
+		document.body.className += " has-news";
+	});
 
 	// demo: the game did not call us (normal browser) or demo=1 was asked
-	var live = false;
 	function demo() {
-		document.body.className += " demo";
 		window.GameDetails("nGc.BR | Zombie Escape", "", q.map || "ze_lotr_minas_tirith_v3_3", 32, "", "zombieescape");
 		var steps = [
 			[0, function () { SetStatusChanged("Retrieving server info..."); }],
 			[1500, function () { SetStatusChanged("Requesting Workshop files"); SetFilesTotal(40); SetFilesNeeded(40); }]
 		];
 		for (var n = 39; n >= 0; n--) (function (left, t) {
-			steps.push([t, function () { DownloadingFile("addon " + (40 - left) + " de 40"); SetFilesNeeded(left); }]);
+			steps.push([t, function () { DownloadingFile("addon"); SetFilesNeeded(left); }]);
 		})(n, 1800 + (39 - n) * 220);
-		steps.push([11000, function () { DownloadingFile(""); SetStatusChanged("Mounting Addons"); }]);
+		steps.push([11000, function () { SetStatusChanged("Mounting Addons"); }]);
 		steps.push([12500, function () { SetStatusChanged("Lua - Loading Lua files"); }]);
 		steps.push([14000, function () { SetStatusChanged("Loading world"); }]);
 		steps.push([16000, function () { SetStatusChanged("Sending client info"); }]);
@@ -448,13 +435,6 @@ body.demo #vs { display: flex; }
 	if (q.demo === "1") demo();
 	// only outside the game: the server always passes map= and sid=, and a slow first call must never show fake files
 	else if (!q.map && !q.sid) setTimeout(function () { if (!live) demo(); }, 2000);
-
-	var vs = document.querySelectorAll("#vs a");
-	for (var a = 0; a < vs.length; a++) vs[a].onclick = function (e) {
-		e.preventDefault();
-		var team = /\bhas-team\b/.test(document.body.className) ? " has-team" : "";
-		document.body.className = "v-" + this.getAttribute("data-v") + " demo" + team;
-	};
 })();
 </script>
 </body>
