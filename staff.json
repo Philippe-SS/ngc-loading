@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-18T01:47:03.505Z",
+ "updated": "2026-10-19T22:23:35.645Z",
  "staff": [
   {
    "id": "76561198011173239",
@@ -12,6 +12,12 @@
    "name": "Sirr John",
    "role": "owner",
    "avatar": "https://avatars.fastly.steamstatic.com/e6fd518f874dd79985ac50344f9ec2e461fda5eb_full.jpg"
+  },
+  {
+   "id": "76561199097840003",
+   "name": "braziliannationalist",
+   "role": "admin",
+   "avatar": "https://avatars.fastly.steamstatic.com/fc22ba973626b26ecf0c3ed0daf83cadbacb8445_full.jpg"
   }
  ]
 }
